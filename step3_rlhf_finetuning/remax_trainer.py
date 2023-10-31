@@ -185,8 +185,8 @@ class DeepSpeedReMaxTrainer:
                         eos_token_pos = self.prompt_length + ans_mask[0].item()
                         baseline_action_mask[i, eos_token_pos] = 1
 
-        output = self.actor_model(seq, attention_mask=action_mask)
         with torch.no_grad():
+            output = self.actor_model(seq, attention_mask=action_mask)
             output_ref = self.ref_model(seq, attention_mask=action_mask)
             reward_score = self.reward_model.forward_value(
                 seq, action_mask, prompt_length=self.prompt_length
@@ -281,6 +281,10 @@ class DeepSpeedReMaxTrainer:
             )
 
         # process the new outputs
+        batch = {"input_ids": seq, "attention_mask": attention_mask}
+        logits = self.actor_model(**batch, use_cache=False).logits
+        log_probs = gather_log_probs(logits[:, :-1, :], seq[:, 1:])
+
         actor_loss = self.actor_loss_fn(
             log_probs[:, start:], returns[:, start:], action_mask[:, start:]
         )
